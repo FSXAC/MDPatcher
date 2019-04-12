@@ -14,6 +14,14 @@ parser.add_argument('input_file', help='Input file path')
 parser.add_argument('-o', '--output_file', nargs=1, help='Output file path')
 args = parser.parse_args()
 
+# Stats TODO: use a counter
+stats = {
+	'fm': 0,
+	'toc': 0,
+	'heading': 0,
+	'latex_tag': 0
+}
+
 # Extract all the lines
 lines = list()
 with open(args.input_file, 'r', encoding='utf-8') as md_file:
@@ -37,6 +45,7 @@ for line in lines:
 		if not line:
 			pass
 		if RE_TRIPLE_DASH.match(line):
+			front_matter_end_index += 1
 			break
 		else:
 			front_matters.append(line)
@@ -51,13 +60,13 @@ for fm in front_matters:
 else:
 	# Use the first header
 	for line in lines:
-		heading = RE_ALL_HEADERS.match(line)
+		heading = RE_ALL_HEADINGS.match(line)
 		if heading:
-			front_matters.append('title: {}'.format(str(heading.group(2))))
+			front_matters.append('title: {}'.format(str(heading.group(1))))
 			break
 
 # Date
-new_date = 'date: {}'.format(datetime.date.today().strftime('%Y-%m-%d'))
+new_date = 'date: {}'.format(datetime.datetime.now().strftime('%Y-%m-%d $H:$m:$s'))
 for index, fm in enumerate(front_matters):
 	if fm.startswith('date:'):
 		front_matters[index] = new_date
@@ -65,15 +74,66 @@ for index, fm in enumerate(front_matters):
 else:
 	front_matters.append(new_date)
 
-print(front_matters)
 lines = lines[front_matter_end_index:]
 
 # Reading the content
+state = 'normal'
 for line_num, line in enumerate(lines):
 	line = line.rstrip()
 
-	if RE_TOC.match(line):
-		lines[line_num] = '- toc\n{:toc}\n'
+	if state == 'in_math_block':
+		# Switch states
+		math_block = RE_MATH_BLOCK.match(line)
+		if math_block:
+			state = 'normal'
+
+			# check if there's a line below
+			beginning = math_block.group(1).rstrip()
+			if lines[line_num + 1].rstrip() != beginning:
+				line = '{}{}\n{}'.format(math_block.group(1), math_block.group(2), beginning)
+	
+	elif state == 'in_code_block':
+		# Switch states
+		if RE_CODE_BLOCK.match(line):
+			state = 'normal'
+			continue
+
+		if RE_MATH_BLOCK.match(line):
+			# TODO: fix math block spacing
+			continue
+
+	elif state == 'normal':
+		# Switch states
+		if RE_CODE_BLOCK.match(line):
+			state = 'in_code_block'
+			continue
+		
+		math_block = RE_MATH_BLOCK.match(line)
+		if math_block:
+			state = 'in_math_block'
+
+			# Check if there's a line above
+			beginning = math_block.group(1).rstrip()
+			if lines[line_num - 1].rstrip() != beginning:
+				line = '{}\n{}{}'.format(beginning, math_block.group(1), math_block.group(2))
+
+		# Fix TOC
+		line = re.sub(RE_TOC.pattern, '- toc\n{:toc}', line)
+
+		# Fix non standard heading
+		line = re.sub(RE_ALL_BAD_HEADINGS.pattern, r'\1 \2', line)
+		
+		# Fix single $ latex tags
+		line = re.sub(RE_SINGLE_LATEX.pattern, r'\1$$\2$$\3', line)
+
+	# Put it together
+	lines[line_num] = '{}\n'.format(line)
+
+
+# Combined regex fixing
+# TODO: Fix vertical | in math
+
+combined_lines = ''.join(lines)
 
 # OUTPUT
 if args.output_file:
@@ -81,4 +141,5 @@ if args.output_file:
 		md_file.write('---\n')
 		md_file.write('\n'.join(front_matters))
 		md_file.write('\n---\n\n')
-		md_file.writelines(lines)
+		md_file.write(combined_lines)
+		# md_file.writelines(lines)
