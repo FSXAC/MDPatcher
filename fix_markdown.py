@@ -166,6 +166,9 @@ def main(filepath):
 if __name__ == '__main__':
 	if os.path.isdir(args.input):
 		for file in os.listdir(args.input):
+			if not file.endswith('.md'):
+				continue
+
 			print('Processing {} ...'.format(file))
 
 			file = os.path.join(args.input, file)
