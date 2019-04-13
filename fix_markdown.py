@@ -91,6 +91,8 @@ for line_num, line in enumerate(lines):
 			beginning = math_block.group(1).rstrip()
 			if lines[line_num + 1].rstrip() != beginning:
 				line = '{}{}\n{}'.format(math_block.group(1), math_block.group(2), beginning)
+
+		line = line.replace('|', r'\vert ')
 	
 	elif state == 'in_code_block':
 		# Switch states
@@ -126,9 +128,30 @@ for line_num, line in enumerate(lines):
 		# Fix single $ latex tags
 		line = re.sub(RE_SINGLE_LATEX.pattern, r'\1$$\2$$\3', line)
 
+		# Replace improper symbols in inline math blocks
+		inline_math_iter = RE_INLINE_MATH.finditer(line)
+		new_line = ''
+		prev_end = 0
+		while True:
+			try:
+				# print(next(inline_math_iter).group(1))
+				match = next(inline_math_iter)
+
+				new_line += line[prev_end:match.start()]
+				new_line += '{}$${}$${}'.format(
+					match.group(1),
+					match.group(2)
+						.replace('|', r'\vert '),
+				match.group(3))
+				prev_end = match.end()
+
+			except StopIteration:
+				break
+		new_line += line[prev_end:]
+		line = new_line
+
 	# Put it together
 	lines[line_num] = '{}\n'.format(line)
-
 
 # Combined regex fixing
 # TODO: Fix vertical | in math
@@ -137,9 +160,12 @@ combined_lines = ''.join(lines)
 
 # OUTPUT
 if args.output_file:
-	with open(args.output_file[0], 'w', encoding='utf-8') as md_file:
-		md_file.write('---\n')
-		md_file.write('\n'.join(front_matters))
-		md_file.write('\n---\n\n')
-		md_file.write(combined_lines)
-		# md_file.writelines(lines)
+	out_file = args.output_file[0]
+else:
+	out_file = args.input_file
+
+with open(out_file, 'w', encoding='utf-8') as md_file:
+	md_file.write('---\n')
+	md_file.write('\n'.join(front_matters))
+	md_file.write('\n---\n')
+	md_file.write(combined_lines)
