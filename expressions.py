@@ -8,7 +8,7 @@ RE_ALL_BAD_HEADINGS = re.compile(r'^(#{1,6})([^ \n#].+)$')
 
 RE_TOC = re.compile(r'^\[(toc|TOC)\]$')
 
-RE_SINGLE_LATEX = re.compile(r'(^|[^\\^\$])\$([^\$]+)\$([^\$]|$)')
+RE_SINGLE_LATEX = re.compile(r'(^|[^`\\^\$])\$([^\$]+)\$([^\$]|$)')
 
 RE_CODE_BLOCK = re.compile(r'^```.*$')
 RE_MATH_BLOCK = re.compile(r'^([^\n\$]*)(\$\$)$')

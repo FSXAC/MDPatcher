@@ -12,6 +12,7 @@ from expressions import *
 parser = argparse.ArgumentParser(description='Fixes markdown files')
 parser.add_argument('input', help='Input file/folder path')
 parser.add_argument('-o', '--output_file', nargs=1, help='Output file path')
+parser.add_argument('--update-date', action='store_true', help='Update the date of the file to now')
 args = parser.parse_args()
 
 # Stats TODO: use a counter
@@ -21,6 +22,8 @@ stats = {
 	'heading': 0,
 	'latex_tag': 0
 }
+
+line_ending = '\n'
 
 def main(filepath):
 
@@ -68,13 +71,14 @@ def main(filepath):
 				break
 
 	# Date
-	new_date = 'date: {}'.format(datetime.datetime.now().strftime('%Y-%m-%d $H:$m:$s'))
-	for index, fm in enumerate(front_matters):
-		if fm.startswith('date:'):
-			front_matters[index] = new_date
-			break
-	else:
-		front_matters.append(new_date)
+	if args.update_date:
+		new_date = 'date: {}'.format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+		for index, fm in enumerate(front_matters):
+			if fm.startswith('date:'):
+				front_matters[index] = new_date
+				break
+		else:
+			front_matters.append(new_date)
 
 	lines = lines[front_matter_end_index:]
 
@@ -93,7 +97,7 @@ def main(filepath):
 				beginning = math_block.group(1).rstrip()
 				if line_num + 1 < len(lines):
 					if lines[line_num + 1].rstrip() != beginning:
-						line = '{}{}\n{}'.format(math_block.group(1), math_block.group(2), beginning)
+						line = '{}{}{}{}'.format(math_block.group(1), math_block.group(2), line_ending, beginning)
 
 			line = line.replace('|', r'\vert ')
 		
@@ -121,7 +125,7 @@ def main(filepath):
 				beginning = math_block.group(1).rstrip()
 				if line_num - 1 >= 0:
 					if lines[line_num - 1].rstrip() != beginning:
-						line = '{}\n{}{}'.format(beginning, math_block.group(1), math_block.group(2))
+						line = '{}{}{}{}'.format(beginning, line_ending, math_block.group(1), math_block.group(2))
 
 			# Fix TOC
 			line = re.sub(RE_TOC.pattern, '- toc\n{:toc}', line)
@@ -155,12 +159,18 @@ def main(filepath):
 			line = new_line
 
 		# Put it together
-		lines[line_num] = '{}\n'.format(line)
+		lines[line_num] = '{}{}'.format(line, line_ending)
 
 	# Combined regex fixing
 	# TODO: Fix vertical | in math
 
 	combined_lines = '---\n{}\n---\n{}'.format('\n'.join(front_matters), ''.join(lines))
+	combined_lines = line_ending.join([
+		'---',
+		line_ending.join(front_matters),
+		'---',
+		''.join(lines)
+	])
 	return combined_lines
 
 if __name__ == '__main__':
